@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { evaluateParking } from "@/lib/parking/evaluate";
+import { reverseGeocodeWithNominatim } from "@/lib/parking/services/reverse-geocode";
 import type { ParkingCheckRequest } from "@/types/parking";
 
 export async function POST(request: Request) {
@@ -19,7 +20,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const decision = evaluateParking(body as ParkingCheckRequest);
+    const liveReverseGeocode = await reverseGeocodeWithNominatim(body.lat, body.lng);
+    const decision = evaluateParking(body as ParkingCheckRequest, {
+      liveRoadName: liveReverseGeocode?.roadName ?? null,
+    });
 
     return NextResponse.json(decision);
   } catch {

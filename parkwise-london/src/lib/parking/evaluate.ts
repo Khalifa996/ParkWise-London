@@ -14,6 +14,10 @@ import type {
   ParkingStatus,
 } from "@/types/parking";
 
+type EvaluateParkingOptions = {
+  liveRoadName?: string | null;
+};
+
 function headlineFromStatus(status: ParkingStatus) {
   if (status === "allowed") {
     return "Parking looks allowed";
@@ -32,6 +36,7 @@ function fallbackDecision(
   checkedAt: string,
   borough: string,
   roadName: string,
+  roadNameSource: "live_reverse_geocode" | "mock_feature",
   bayType: string,
   restrictionObjectName: string,
   restrictionTimes: string,
@@ -46,6 +51,7 @@ function fallbackDecision(
     headline: headlineFromStatus(status),
     borough,
     roadName,
+    roadNameSource,
     bayType,
     restrictionObjectName,
     restrictionTimes,
@@ -92,10 +98,14 @@ function buildContext(
     boroughName,
     feature,
     isRestrictedNow: isRestrictedNow(day, hour, feature.restrictions),
+    resolvedRoadName: feature.roadName,
+    roadNameSource: "mock_feature",
   };
 }
-
-export function evaluateParking(request: ParkingCheckRequest): ParkingDecision {
+export function evaluateParking(
+  request: ParkingCheckRequest,
+  options: EvaluateParkingOptions = {},
+): ParkingDecision {
   const snapshot = getLondonTimeSnapshot();
   const borough = findBorough(request.lat, request.lng);
 
@@ -106,6 +116,7 @@ export function evaluateParking(request: ParkingCheckRequest): ParkingDecision {
       snapshot.label,
       "Outside supported boroughs",
       "Unknown road",
+      "mock_feature",
       "Unknown",
       "Unknown restriction object",
       "Unknown",
@@ -122,7 +133,13 @@ export function evaluateParking(request: ParkingCheckRequest): ParkingDecision {
 
   const matchedFeature = findRestrictionFeature(request.lat, request.lng, borough.name);
   const nearestFeature = findNearestRestrictionFeature(request.lat, request.lng, borough.name);
-  const reverseGeocodedRoad = reverseGeocodeRoadName(request.lat, request.lng, borough.name) ?? "Unknown road";
+  const reverseGeocodedRoad =
+    options.liveRoadName ??
+    reverseGeocodeRoadName(request.lat, request.lng, borough.name) ??
+    "Unknown road";
+  const roadNameSource = options.liveRoadName
+    ? "live_reverse_geocode"
+    : "mock_feature";
 
   if (!matchedFeature || !nearestFeature) {
     return fallbackDecision(
@@ -131,6 +148,7 @@ export function evaluateParking(request: ParkingCheckRequest): ParkingDecision {
       snapshot.label,
       borough.name,
       reverseGeocodedRoad,
+      roadNameSource,
       nearestFeature?.bayType ?? "Unknown bay type",
       nearestFeature?.restrictionObjectName ?? "No mapped restriction object",
       nearestFeature?.restrictionTimesLabel ?? "Unknown",
@@ -155,6 +173,8 @@ export function evaluateParking(request: ParkingCheckRequest): ParkingDecision {
     snapshot.day,
     snapshot.hour,
   );
+  context.resolvedRoadName = reverseGeocodedRoad;
+  context.roadNameSource = roadNameSource;
 
   return evaluateRuleByKind(context);
 }

@@ -70,6 +70,7 @@ export type ParkingDecision = {
   headline: string;
   borough: string;
   roadName: string;
+  roadNameSource: "live_reverse_geocode" | "mock_feature";
   bayType: string;
   restrictionObjectName: string;
   restrictionTimes: string;
@@ -90,6 +91,8 @@ export type ParkingEvaluationContext = {
   boroughName: string;
   feature: ParkingRestrictionFeature;
   isRestrictedNow: boolean;
+  resolvedRoadName: string;
+  roadNameSource: "live_reverse_geocode" | "mock_feature";
 };
 
 export type SavedVehicleProfile = {

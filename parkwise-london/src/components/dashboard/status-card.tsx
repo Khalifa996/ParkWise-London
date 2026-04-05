@@ -28,6 +28,12 @@ function formatVehicleType(vehicleType: ParkingDecision["vehicleType"]) {
   }
 }
 
+function formatRoadSource(roadNameSource: ParkingDecision["roadNameSource"]) {
+  return roadNameSource === "live_reverse_geocode"
+    ? "Live reverse geocode"
+    : "Mock fallback";
+}
+
 type StatusCardProps = {
   result: ParkingDecision | null;
   loading: boolean;
@@ -85,6 +91,7 @@ export function StatusCard({ result, loading, error }: StatusCardProps) {
         <div className="rounded-2xl border border-current/15 bg-black/10 p-4">
           <p className="text-xs uppercase tracking-[0.2em] text-current/70">Road Name</p>
           <p className="mt-2 font-medium">{result.roadName}</p>
+          <p className="mt-1 text-xs text-current/70">{formatRoadSource(result.roadNameSource)}</p>
         </div>
         <div className="rounded-2xl border border-current/15 bg-black/10 p-4">
           <p className="text-xs uppercase tracking-[0.2em] text-current/70">Date And Time</p>

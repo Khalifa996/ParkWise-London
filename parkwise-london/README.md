@@ -8,7 +8,7 @@ ParkWise London is a lightweight full-stack Next.js prototype for checking wheth
 - Detects the user's location when permission is granted
 - Lets the user drop a pin anywhere on the map
 - Matches Tower Hamlets pins against mocked road-level restriction features instead of broad generic zones
-- Reverse geocodes the pin to a mocked nearest road name for Tower Hamlets
+- Uses live reverse geocoding for the dropped pin when available, then falls back to the nearest mapped mock road name
 - Displays road name, nearest restriction object, bay type, and restriction times in the result panel
 - Applies mocked Tower Hamlets rule logic for resident bays, pay by phone bays, shared use bays, single yellow lines, double yellow lines, and loading bays
 - Lets the user save, edit, and reuse multiple local vehicle profiles in browser storage
@@ -23,7 +23,8 @@ ParkWise London is a lightweight full-stack Next.js prototype for checking wheth
 - Tailwind CSS v4
 - Leaflet with React Leaflet
 - API route for parking decision logic
-- Mock data only, no database
+- Live reverse geocoding via OpenStreetMap Nominatim
+- Mock Tower Hamlets restriction features, no database yet
 - Browser `localStorage` for saved profiles
 
 ## Environment requirements
@@ -65,6 +66,8 @@ src/
       time.ts
       rules/
         tower-hamlets.ts
+      services/
+        reverse-geocode.ts
     profiles/
       helpers.ts
       storage.ts
@@ -88,8 +91,9 @@ src/
 
 ## Road-aware matching notes
 
-- Tower Hamlets matching is now attached to mocked road and restriction features rather than only broad test areas
-- Reverse geocoding currently uses nearby mocked feature data, not live council GIS feeds or a production geocoder
+- Tower Hamlets matching is attached to mocked road and restriction features rather than only broad test areas
+- Reverse geocoding now calls OpenStreetMap Nominatim from the server route when available
+- If the live reverse geocode lookup fails or returns no road, the app falls back to the nearest mocked feature road name
 - If a pin falls outside a mapped feature but inside Tower Hamlets, the app falls back to the nearest mocked restriction object for guidance
 - Roadside signs, kerb markings, and bay plates always override the app result
 
@@ -125,7 +129,7 @@ Exact deployment steps:
    NEXT_PUBLIC_ENABLE_DEV_TEST_PANEL=true
    ```
 8. Click `Deploy`.
-9. After the first deploy finishes, open the production URL and test a few mocked Tower Hamlets road features.
+9. After the first deploy finishes, open the production URL and test a few Tower Hamlets road features.
 
 Recommended Vercel settings:
 
