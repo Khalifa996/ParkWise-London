@@ -1,4 +1,4 @@
-import type { BoroughDefinition, ParkingBayRule } from "@/types/parking";
+import type { BoroughDefinition, ParkingBayRule, TestZone } from "@/types/parking";
 
 export const LONDON_CENTER: [number, number] = [51.5074, -0.1278];
 
@@ -141,3 +141,29 @@ export const PARKING_BAY_RULES: ParkingBayRule[] = [
     ],
   },
 ];
+
+function zoneCenter(rule: ParkingBayRule): [number, number] {
+  return [
+    (rule.bounds.north + rule.bounds.south) / 2,
+    (rule.bounds.east + rule.bounds.west) / 2,
+  ];
+}
+
+const TEST_ZONE_COLORS = [
+  "#14b8a6",
+  "#2563eb",
+  "#f59e0b",
+  "#ec4899",
+  "#8b5cf6",
+  "#f97316",
+];
+
+export const TOWER_HAMLETS_TEST_ZONES: TestZone[] = PARKING_BAY_RULES.map((rule, index) => ({
+  id: rule.id,
+  name: rule.name,
+  borough: rule.borough,
+  bayType: rule.bayType,
+  center: zoneCenter(rule),
+  bounds: rule.bounds,
+  color: TEST_ZONE_COLORS[index % TEST_ZONE_COLORS.length],
+}));

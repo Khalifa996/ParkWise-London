@@ -32,9 +32,10 @@ type StatusCardProps = {
   result: ParkingDecision | null;
   loading: boolean;
   error: string | null;
+  matchedZoneName: string;
 };
 
-export function StatusCard({ result, loading, error }: StatusCardProps) {
+export function StatusCard({ result, loading, error, matchedZoneName }: StatusCardProps) {
   if (loading) {
     return (
       <section className="rounded-[28px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.28)]">
@@ -97,6 +98,10 @@ export function StatusCard({ result, loading, error }: StatusCardProps) {
         <div className="rounded-2xl border border-current/15 bg-black/10 p-4 sm:col-span-2">
           <p className="text-xs uppercase tracking-[0.2em] text-current/70">Matched Rule</p>
           <p className="mt-2 font-medium">{result.bayType} in {result.ruleSource}</p>
+        </div>
+        <div className="rounded-2xl border border-current/15 bg-black/10 p-4 sm:col-span-2">
+          <p className="text-xs uppercase tracking-[0.2em] text-current/70">Matched Zone Name</p>
+          <p className="mt-2 font-medium">{matchedZoneName}</p>
         </div>
       </div>
 

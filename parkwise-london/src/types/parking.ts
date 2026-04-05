@@ -83,3 +83,25 @@ export type ParkingEvaluationContext = {
   bayRule: ParkingBayRule;
   isRestrictedNow: boolean;
 };
+
+export type SavedVehicleProfile = {
+  id: string;
+  name: string;
+  vehicleType: VehicleType;
+  hasBlueBadge: boolean;
+};
+
+export type TestZone = {
+  id: string;
+  name: string;
+  borough: string;
+  bayType: string;
+  center: [number, number];
+  bounds: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  };
+  color: string;
+};

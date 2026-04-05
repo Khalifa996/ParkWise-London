@@ -5,17 +5,21 @@ import {
   CircleMarker,
   MapContainer,
   Popup,
+  Rectangle,
   TileLayer,
+  Tooltip,
   useMap,
   useMapEvents,
 } from "react-leaflet";
 import type { LatLngExpression } from "leaflet";
+import type { TestZone } from "@/types/parking";
 
 type ParkingMapProps = {
   center: [number, number];
   pin: [number, number] | null;
   userLocation: [number, number] | null;
   onPinChange: (coords: [number, number]) => void;
+  testZones?: TestZone[];
 };
 
 function MapClickHandler({ onPinChange }: { onPinChange: (coords: [number, number]) => void }) {
@@ -38,7 +42,13 @@ function RecenterMap({ center }: { center: LatLngExpression }) {
   return null;
 }
 
-export function ParkingMap({ center, pin, userLocation, onPinChange }: ParkingMapProps) {
+export function ParkingMap({
+  center,
+  pin,
+  userLocation,
+  onPinChange,
+  testZones = [],
+}: ParkingMapProps) {
   return (
     <MapContainer
       center={center}
@@ -51,6 +61,30 @@ export function ParkingMap({ center, pin, userLocation, onPinChange }: ParkingMa
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      {testZones.map((zone) => (
+        <Rectangle
+          key={zone.id}
+          bounds={[
+            [zone.bounds.south, zone.bounds.west],
+            [zone.bounds.north, zone.bounds.east],
+          ]}
+          pathOptions={{
+            color: zone.color,
+            weight: 2,
+            fillColor: zone.color,
+            fillOpacity: 0.12,
+          }}
+          eventHandlers={{
+            click() {
+              onPinChange(zone.center);
+            },
+          }}
+        >
+          <Tooltip sticky>
+            {zone.name} ({zone.bayType})
+          </Tooltip>
+        </Rectangle>
+      ))}
       <MapClickHandler onPinChange={onPinChange} />
       <RecenterMap center={pin ?? userLocation ?? center} />
       {userLocation ? (
