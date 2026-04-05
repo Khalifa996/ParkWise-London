@@ -1,3 +1,4 @@
+import { SEEDED_VEHICLE_PROFILES } from "@/lib/parking/mock-data";
 import type { SavedVehicleProfile, VehicleType } from "@/types/parking";
 
 export function createVehicleProfile(
@@ -11,4 +12,8 @@ export function createVehicleProfile(
     vehicleType,
     hasBlueBadge,
   };
+}
+
+export function getSeededVehicleProfiles(): SavedVehicleProfile[] {
+  return SEEDED_VEHICLE_PROFILES.map((profile) => ({ ...profile }));
 }

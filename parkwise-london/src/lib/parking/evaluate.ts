@@ -1,10 +1,16 @@
-import { findBorough, findParkingBayRule } from "@/lib/parking/geo";
-import { evaluateRuleByKind } from "@/lib/parking/rules/tower-hamlets";
+import {
+  findBorough,
+  findNearestRestrictionFeature,
+  findRestrictionFeature,
+  reverseGeocodeRoadName,
+} from "@/lib/parking/geo";
+import { evaluateRuleByKind, ROADSIDE_SIGNS_WARNING } from "@/lib/parking/rules/tower-hamlets";
 import { getLondonTimeSnapshot } from "@/lib/parking/time";
 import type {
   ParkingCheckRequest,
   ParkingDecision,
   ParkingEvaluationContext,
+  ParkingRestrictionFeature,
   ParkingStatus,
 } from "@/types/parking";
 
@@ -25,8 +31,12 @@ function fallbackDecision(
   status: ParkingStatus,
   checkedAt: string,
   borough: string,
+  roadName: string,
   bayType: string,
+  restrictionObjectName: string,
+  restrictionTimes: string,
   ruleSource: string,
+  matchedZoneName: string,
   summary: string,
   details: string[],
   warningMessages: string[] = [],
@@ -35,17 +45,21 @@ function fallbackDecision(
     status,
     headline: headlineFromStatus(status),
     borough,
+    roadName,
     bayType,
+    restrictionObjectName,
+    restrictionTimes,
     checkedAt,
     ruleSource,
+    matchedZoneName,
     vehicleType: request.exemptions.vehicleType,
     hasBlueBadge: request.exemptions.hasBlueBadge,
     explanation: {
       summary,
       details,
-      warning: warningMessages[0],
+      warning: ROADSIDE_SIGNS_WARNING,
     },
-    warningMessages,
+    warningMessages: [ROADSIDE_SIGNS_WARNING, ...warningMessages],
   };
 }
 
@@ -62,6 +76,25 @@ function isRestrictedNow(
   );
 }
 
+function buildContext(
+  request: ParkingCheckRequest,
+  checkedAt: string,
+  boroughName: string,
+  feature: ParkingRestrictionFeature,
+  day: number,
+  hour: number,
+): ParkingEvaluationContext {
+  return {
+    day,
+    hour,
+    checkedAt,
+    request,
+    boroughName,
+    feature,
+    isRestrictedNow: isRestrictedNow(day, hour, feature.restrictions),
+  };
+}
+
 export function evaluateParking(request: ParkingCheckRequest): ParkingDecision {
   const snapshot = getLondonTimeSnapshot();
   const borough = findBorough(request.lat, request.lng);
@@ -72,45 +105,56 @@ export function evaluateParking(request: ParkingCheckRequest): ParkingDecision {
       "limited",
       snapshot.label,
       "Outside supported boroughs",
+      "Unknown road",
+      "Unknown",
+      "Unknown restriction object",
       "Unknown",
       "Mock borough coverage",
+      "No matched zone",
       "This pin is outside the boroughs currently modeled in ParkWise London.",
       [
-        "The v1 prototype only includes mocked Tower Hamlets coverage.",
+        "The road-aware v1 prototype only includes mocked Tower Hamlets restriction features.",
         "Because the point is outside that supported area, the app cannot give a reliable legal parking decision yet.",
       ],
       ["Coverage is incomplete outside Tower Hamlets in this version."],
     );
   }
 
-  const bayRule = findParkingBayRule(request.lat, request.lng, borough.name);
+  const matchedFeature = findRestrictionFeature(request.lat, request.lng, borough.name);
+  const nearestFeature = findNearestRestrictionFeature(request.lat, request.lng, borough.name);
+  const reverseGeocodedRoad = reverseGeocodeRoadName(request.lat, request.lng, borough.name) ?? "Unknown road";
 
-  if (!bayRule) {
+  if (!matchedFeature || !nearestFeature) {
     return fallbackDecision(
       request,
       "limited",
       snapshot.label,
       borough.name,
-      "Unknown bay type",
-      "Tower Hamlets mock zones",
-      "The borough is known, but this exact point does not map to a parking rule yet.",
+      reverseGeocodedRoad,
+      nearestFeature?.bayType ?? "Unknown bay type",
+      nearestFeature?.restrictionObjectName ?? "No mapped restriction object",
+      nearestFeature?.restrictionTimesLabel ?? "Unknown",
+      "Tower Hamlets mock road features",
+      nearestFeature?.name ?? "No matched zone",
+      "The borough is known, but this exact point does not map to a road-level restriction feature yet.",
       [
-        `The pin falls inside ${borough.name}, but not inside one of the mocked rule areas.`,
-        "This usually means the prototype does not yet know the exact bay type or line marking for this location.",
+        `The pin falls inside ${borough.name}, but not inside a mapped restriction feature.`,
+        nearestFeature
+          ? `The nearest mocked object is ${nearestFeature.restrictionObjectName} on ${nearestFeature.roadName}.`
+          : "No nearby mock feature was found.",
       ],
-      ["No street-level rule has been mapped for this exact point in v1."],
+      ["This road-level match is approximate because live council restriction data is not wired in yet."],
     );
   }
 
-  const context: ParkingEvaluationContext = {
-    day: snapshot.day,
-    hour: snapshot.hour,
-    checkedAt: snapshot.label,
+  const context = buildContext(
     request,
-    boroughName: borough.name,
-    bayRule,
-    isRestrictedNow: isRestrictedNow(snapshot.day, snapshot.hour, bayRule.restrictions),
-  };
+    snapshot.label,
+    borough.name,
+    matchedFeature,
+    snapshot.day,
+    snapshot.hour,
+  );
 
   return evaluateRuleByKind(context);
 }

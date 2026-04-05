@@ -28,10 +28,12 @@ export type TimeRule = {
   maxStayMinutes?: number;
 };
 
-export type ParkingBayRule = {
+export type ParkingRestrictionFeature = {
   id: string;
   name: string;
   borough: string;
+  roadName: string;
+  restrictionObjectName: string;
   bayType: string;
   kind: RuleKind;
   bounds: {
@@ -41,7 +43,9 @@ export type ParkingBayRule = {
     west: number;
   };
   restrictions: TimeRule[];
+  restrictionTimesLabel: string;
   maxStayMinutes?: number;
+  color: string;
 };
 
 export type BoroughDefinition = {
@@ -65,9 +69,13 @@ export type ParkingDecision = {
   status: ParkingStatus;
   headline: string;
   borough: string;
+  roadName: string;
   bayType: string;
+  restrictionObjectName: string;
+  restrictionTimes: string;
   checkedAt: string;
   ruleSource: string;
+  matchedZoneName: string;
   vehicleType: VehicleType;
   hasBlueBadge: boolean;
   explanation: ParkingExplanation;
@@ -80,7 +88,7 @@ export type ParkingEvaluationContext = {
   checkedAt: string;
   request: ParkingCheckRequest;
   boroughName: string;
-  bayRule: ParkingBayRule;
+  feature: ParkingRestrictionFeature;
   isRestrictedNow: boolean;
 };
 
@@ -95,6 +103,7 @@ export type TestZone = {
   id: string;
   name: string;
   borough: string;
+  roadName: string;
   bayType: string;
   center: [number, number];
   bounds: {
