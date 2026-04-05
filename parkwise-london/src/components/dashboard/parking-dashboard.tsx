@@ -6,9 +6,15 @@ import { StatusCard } from "@/components/dashboard/status-card";
 import { VehicleProfilesPanel } from "@/components/profiles/vehicle-profiles-panel";
 import { DeveloperTestPanel } from "@/components/testing/developer-test-panel";
 import { DEV_TEST_PANEL_ENABLED } from "@/lib/config";
-import { findBorough, findParkingBayRule } from "@/lib/parking/geo";
-import { LONDON_CENTER, TOWER_HAMLETS_TEST_ZONES } from "@/lib/parking/mock-data";
-import { createVehicleProfile } from "@/lib/profiles/helpers";
+import { findBorough, findRestrictionFeature } from "@/lib/parking/geo";
+import {
+  LONDON_CENTER,
+  TOWER_HAMLETS_TEST_ZONES,
+} from "@/lib/parking/mock-data";
+import {
+  createVehicleProfile,
+  getSeededVehicleProfiles,
+} from "@/lib/profiles/helpers";
 import { STORAGE_KEY } from "@/lib/profiles/storage";
 import type {
   ParkingCheckRequest,
@@ -37,6 +43,18 @@ const vehicleOptions: { value: VehicleType; label: string }[] = [
   { value: "commercial", label: "Commercial" },
 ];
 
+function legendEntries() {
+  const unique = new Map<string, string>();
+
+  TOWER_HAMLETS_TEST_ZONES.forEach((zone) => {
+    if (!unique.has(zone.bayType)) {
+      unique.set(zone.bayType, zone.color);
+    }
+  });
+
+  return Array.from(unique.entries()).map(([label, color]) => ({ label, color }));
+}
+
 export function ParkingDashboard() {
   const [pin, setPin] = useState<[number, number] | null>(null);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
@@ -56,7 +74,7 @@ export function ParkingDashboard() {
 
   const matchedZoneName = useMemo(() => {
     if (!pin) {
-      return "No zone matched yet";
+      return "No matched feature yet";
     }
 
     const borough = findBorough(pin[0], pin[1]);
@@ -64,21 +82,38 @@ export function ParkingDashboard() {
       return "Outside supported boroughs";
     }
 
-    const rule = findParkingBayRule(pin[0], pin[1], borough.name);
-    return rule ? rule.name : `${borough.name} coverage, but no mapped test zone`;
+    const feature = findRestrictionFeature(pin[0], pin[1], borough.name);
+    return feature ? feature.name : `${borough.name} coverage, but no mapped road feature`;
   }, [pin]);
 
   useEffect(() => {
     try {
       const storedProfiles = window.localStorage.getItem(STORAGE_KEY);
       if (!storedProfiles) {
+        const seededProfiles = getSeededVehicleProfiles();
+        setProfiles(seededProfiles);
+        setActiveProfileId(seededProfiles[0]?.id ?? null);
+        setVehicleType(seededProfiles[0]?.vehicleType ?? "car");
+        setHasBlueBadge(seededProfiles[0]?.hasBlueBadge ?? false);
         return;
       }
 
       const parsedProfiles = JSON.parse(storedProfiles) as SavedVehicleProfile[];
-      setProfiles(parsedProfiles);
+      const nextProfiles =
+        parsedProfiles.length > 0 ? parsedProfiles : getSeededVehicleProfiles();
+      setProfiles(nextProfiles);
+      if (nextProfiles[0]) {
+        setActiveProfileId(nextProfiles[0].id);
+        setVehicleType(nextProfiles[0].vehicleType);
+        setHasBlueBadge(nextProfiles[0].hasBlueBadge);
+      }
     } catch {
       window.localStorage.removeItem(STORAGE_KEY);
+      const seededProfiles = getSeededVehicleProfiles();
+      setProfiles(seededProfiles);
+      setActiveProfileId(seededProfiles[0]?.id ?? null);
+      setVehicleType(seededProfiles[0]?.vehicleType ?? "car");
+      setHasBlueBadge(seededProfiles[0]?.hasBlueBadge ?? false);
     }
   }, []);
 
@@ -186,9 +221,15 @@ export function ParkingDashboard() {
   }
 
   function handleDeleteProfile(profileId: string) {
-    setProfiles((current) => current.filter((profile) => profile.id !== profileId));
+    const nextProfiles = profiles.filter((profile) => profile.id !== profileId);
+    setProfiles(nextProfiles);
+
     if (activeProfileId === profileId) {
-      setActiveProfileId(null);
+      setActiveProfileId(nextProfiles[0]?.id ?? null);
+      if (nextProfiles[0]) {
+        setVehicleType(nextProfiles[0].vehicleType);
+        setHasBlueBadge(nextProfiles[0].hasBlueBadge);
+      }
     }
   }
 
@@ -218,6 +259,8 @@ export function ParkingDashboard() {
     setPin(zone.center);
   }
 
+  const overlayLegend = legendEntries();
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
       <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.22),_transparent_32%),linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(15,23,42,0.84)_45%,_rgba(10,37,64,0.96))] p-8 shadow-[0_28px_100px_rgba(15,23,42,0.38)]">
@@ -225,20 +268,20 @@ export function ParkingDashboard() {
           <div className="max-w-3xl">
             <p className="text-sm uppercase tracking-[0.34em] text-teal-200/80">ParkWise London</p>
             <h1 className="mt-4 max-w-2xl text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
-              Quick parking guidance for a pinned spot in London.
+              Road-aware parking guidance for a pinned spot in Tower Hamlets.
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-200/82 sm:text-lg">
-              Drop a pin, detect your current position, and get a simple parking decision based on mocked borough rules, bay type, and basic exemptions.
+              Drop a pin, detect your current position, and get a road-level parking decision based on mocked restriction features, bay type, road name, and driver exemptions.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:w-[380px]">
+          <div className="grid gap-3 sm:grid-cols-2 lg:w-[420px]">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-slate-100 backdrop-blur">
               <p className="text-xs uppercase tracking-[0.22em] text-teal-200/75">Coverage</p>
-              <p className="mt-2 text-sm leading-6">Tower Hamlets rules only in v1, designed to expand borough by borough.</p>
+              <p className="mt-2 text-sm leading-6">Tower Hamlets only for now, with the architecture ready for borough-by-borough expansion.</p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-slate-100 backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.22em] text-teal-200/75">Time Basis</p>
-              <p className="mt-2 text-sm leading-6">Checks use current London time, not the browser&apos;s local timezone.</p>
+              <p className="text-xs uppercase tracking-[0.22em] text-teal-200/75">Data Source</p>
+              <p className="mt-2 text-sm leading-6">Road names and restrictions are mocked road features until live council data is wired in.</p>
             </div>
           </div>
         </div>
@@ -271,6 +314,17 @@ export function ParkingDashboard() {
             onPinChange={setPin}
             testZones={TOWER_HAMLETS_TEST_ZONES}
           />
+          <div className="flex flex-wrap gap-2 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+            {overlayLegend.map((entry) => (
+              <span
+                key={entry.label}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700"
+              >
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                {entry.label}
+              </span>
+            ))}
+          </div>
           <div className="grid gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 sm:grid-cols-3">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Map Center</p>
@@ -281,7 +335,7 @@ export function ParkingDashboard() {
               <p className="mt-2 font-medium text-slate-900">{pin ? `${pin[0].toFixed(5)}, ${pin[1].toFixed(5)}` : "No pin yet"}</p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Matched Zone</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Matched Feature</p>
               <p className="mt-2 font-medium text-slate-900">{matchedZoneName}</p>
             </div>
           </div>
@@ -300,18 +354,18 @@ export function ParkingDashboard() {
               <div>
                 <p className="text-sm uppercase tracking-[0.24em] text-teal-200/70">User Context</p>
                 <p className="mt-2 text-sm leading-6 text-slate-300">
-                  {activeProfileId ? "A saved profile is active and used automatically in each parking check." : "Choose a vehicle type and Blue Badge setting, or apply a saved profile."}
+                  {activeProfileId ? "A saved or seeded profile is active and used automatically in each parking check." : "Choose a vehicle type and Blue Badge setting, or apply a saved profile."}
                 </p>
               </div>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-300">
-                {activeProfileId ? "Saved profile" : "Custom"}
+                {activeProfileId ? "Profile active" : "Custom"}
               </span>
             </div>
             <div className="mt-5 space-y-5">
               <label className="flex items-center justify-between gap-4 rounded-[22px] border border-white/10 bg-white/5 px-4 py-4 text-slate-100">
                 <span>
                   <span className="block text-sm font-medium">Blue Badge</span>
-                  <span className="mt-1 block text-xs text-slate-300">Apply the basic exemption logic used in the mock rules.</span>
+                  <span className="mt-1 block text-xs text-slate-300">Apply the basic exemption logic used in the mock road features.</span>
                 </span>
                 <button
                   type="button"
@@ -355,21 +409,16 @@ export function ParkingDashboard() {
             onDeleteProfile={handleDeleteProfile}
           />
 
-          <StatusCard
-            result={result}
-            loading={loading}
-            error={error}
-            matchedZoneName={matchedZoneName}
-          />
+          <StatusCard result={result} loading={loading} error={error} />
 
           <section className="rounded-[32px] border border-slate-200/70 bg-white/85 p-6 shadow-[0_24px_80px_rgba(148,163,184,0.18)]">
-            <p className="text-sm uppercase tracking-[0.24em] text-slate-500">Mock Logic Notes</p>
+            <p className="text-sm uppercase tracking-[0.24em] text-slate-500">Road-Aware Notes</p>
             <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
-              <li>Checks only include mocked Tower Hamlets coverage for v1.</li>
-              <li>Supported rule types now include resident, pay by phone, shared use, single yellow, double yellow, and loading bays.</li>
+              <li>Checks only include mocked Tower Hamlets road and restriction features.</li>
+              <li>Reverse geocoding currently uses the nearest mapped mock road name, not live council or OSM data.</li>
               <li>Saved profiles live only in browser storage. There is no backend or login yet.</li>
-              <li>Borough and bay matching still use simple bounding boxes instead of precise GIS data.</li>
-              <li>Allowed, Limited, and Not Allowed are guidance states, not legal advice.</li>
+              <li>Roadside signs, kerb markings, and bay plates override app guidance.</li>
+              <li>Architecture is ready to add more boroughs feature-by-feature later.</li>
             </ul>
           </section>
         </div>

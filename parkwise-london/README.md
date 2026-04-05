@@ -2,16 +2,18 @@
 
 ParkWise London is a lightweight full-stack Next.js prototype for checking whether parking is likely allowed at a pinned location in London.
 
-## What v1 does
+## What the current version does
 
 - Shows an interactive map centered on London
 - Detects the user's location when permission is granted
 - Lets the user drop a pin anywhere on the map
-- Identifies whether the point falls inside mocked Tower Hamlets coverage
+- Matches Tower Hamlets pins against mocked road-level restriction features instead of broad generic zones
+- Reverse geocodes the pin to a mocked nearest road name for Tower Hamlets
+- Displays road name, nearest restriction object, bay type, and restriction times in the result panel
 - Applies mocked Tower Hamlets rule logic for resident bays, pay by phone bays, shared use bays, single yellow lines, double yellow lines, and loading bays
-- Lets the user toggle Blue Badge status and vehicle type
-- Lets the user save multiple local vehicle profiles in browser storage
-- Includes a collapsible developer testing panel with quick-jump buttons for mocked zones
+- Lets the user save, edit, and reuse multiple local vehicle profiles in browser storage
+- Seeds a few demo profiles for first-time testing
+- Includes a collapsible developer testing panel with quick-jump buttons and overlay legend chips for mocked zones
 - Returns a decision of Allowed, Not Allowed, or Limited with structured explanations and warnings
 
 ## Tech stack
@@ -55,6 +57,7 @@ src/
     testing/
       developer-test-panel.tsx
   lib/
+    config.ts
     parking/
       evaluate.ts
       geo.ts
@@ -83,27 +86,29 @@ src/
    ```
 3. Open [http://localhost:3000](http://localhost:3000)
 
+## Road-aware matching notes
+
+- Tower Hamlets matching is now attached to mocked road and restriction features rather than only broad test areas
+- Reverse geocoding currently uses nearby mocked feature data, not live council GIS feeds or a production geocoder
+- If a pin falls outside a mapped feature but inside Tower Hamlets, the app falls back to the nearest mocked restriction object for guidance
+- Roadside signs, kerb markings, and bay plates always override the app result
+
 ## Local profile saving
 
 - Saved vehicle profiles are stored in browser `localStorage`
 - Profiles are local to the current browser on the current device
 - There is no backend sync or login in this version
+- Seeded demo profiles are added automatically when the browser has no saved profiles yet
 
 ## Developer testing panel
 
 - The app includes a small collapsible testing panel below the map
-- It lists each mocked Tower Hamlets rule zone
-- Each button jumps the map and pin directly into that test zone
+- It lists each mocked Tower Hamlets restriction feature
+- Each button jumps the map and pin directly into that test area
 - Colored overlays are drawn on the map for each test zone so the mocked areas are visible before clicking
+- Legend chips explain which color maps to each bay or restriction type
 - The panel is isolated in `src/components/testing/developer-test-panel.tsx` for easy removal later
 - By default, the panel is available in development and hidden in production unless `NEXT_PUBLIC_ENABLE_DEV_TEST_PANEL=true`
-
-## Parking logic notes
-
-- v1 only supports mocked Tower Hamlets data
-- Borough detection and bay matching use simple bounding boxes, not official GIS boundaries
-- The result is guidance for prototyping and UX testing, not legal advice
-- The backend evaluates time using the `Europe/London` timezone
 
 ## Vercel deployment
 
@@ -113,14 +118,14 @@ Exact deployment steps:
 2. Sign in to [Vercel](https://vercel.com/).
 3. Click `Add New...` then `Project`.
 4. Import the GitHub repository that contains ParkWise London.
-5. In the project configuration screen, keep the default Next.js framework detection.
-6. Leave the environment variables section empty unless you want the developer testing panel visible in production.
+5. Keep the default Next.js framework detection.
+6. Leave environment variables empty unless you want the developer testing panel visible in production.
 7. If you do want the testing panel in production, add:
    ```text
    NEXT_PUBLIC_ENABLE_DEV_TEST_PANEL=true
    ```
 8. Click `Deploy`.
-9. After the first deploy finishes, open the production URL and test a few mocked Tower Hamlets zones.
+9. After the first deploy finishes, open the production URL and test a few mocked Tower Hamlets road features.
 
 Recommended Vercel settings:
 
